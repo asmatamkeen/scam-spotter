@@ -9,6 +9,7 @@ from fastapi import FastAPI, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from google import genai
 from google.genai import types
+from datetime import date
 
 load_dotenv()
 client = genai.Client(api_key=os.getenv("GEMINI_KEY"))
@@ -16,8 +17,16 @@ client = genai.Client(api_key=os.getenv("GEMINI_KEY"))
 MODEL = "gemma-4-31b-it"
 
 PROMPT = """You are a scam detector helping Indian college students.
-Look at this screenshot or document (message, email, or job/internship offer).
-Only flag clear scam signs. A normal, professional offer should be SAFE.
+Look at this screenshot or document (message, email, or job/internship offer or joining letter).
+
+Today's date is TODAY_DATE. Dates on or before today are in the past. Do NOT flag a date as "future" or "in the future" unless it is after today's date. A document dated in the past is normal.
+
+Be careful and fair. Real companies often include normal things in joining letters: joining date, stipend, working hours, confidentiality or notice-period terms, and an HR contact. These are NOT red flags.
+
+Clear scam signs are: asking the candidate to pay money (registration, training, security deposit, laptop or kit fee), asking for bank details or OTP, free email addresses (Gmail, Yahoo) used as the official company address, urgent pressure to respond, or a job offered with no interview.
+
+Use SCAM only when there is a clear scam sign from that list. Use SUSPICIOUS when something is unusual but not clearly a scam. Use SAFE when none of the clear signs are present.
+
 Reply with ONLY valid JSON, no extra text, in this format:
 {
   "verdict": "SAFE" or "SUSPICIOUS" or "SCAM",
@@ -75,10 +84,15 @@ async def check(file: UploadFile = File(...)):
         parts = [types.Part.from_bytes(data=shrink_image(data), mime_type="image/jpeg")]
 
     last_error = ""
+    prompt = PROMPT.replace("TODAY_DATE", date.today().strftime("%d %B %Y"))
     for attempt in range(3):
         try:
             start = time.time()
-            response = client.models.generate_content(model=MODEL, contents=parts + [PROMPT])
+            response = client.models.generate_content(
+                model=MODEL,
+                contents=parts + [PROMPT],
+                config=types.GenerateContentConfig(temperature=0),
+            )
             print("Gemma took:", round(time.time() - start, 1), "seconds")
             return extract_json(response.text)
         except Exception as e:
