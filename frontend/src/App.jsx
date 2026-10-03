@@ -42,6 +42,7 @@ export default function App() {
       <input type="file" accept="image/*,application/pdf" onChange={handleFile} />
       {file && !preview && <p>📄 {file.name}</p>}
       {preview && <img src={preview} alt="upload" style={{ width: "100%", marginTop: 16, borderRadius: 8 }} />}
+
       <button onClick={check} disabled={!file || loading} style={{ marginTop: 16, padding: "10px 20px", fontSize: 16 }}>
         {loading ? "Checking..." : "Check it"}
       </button>
@@ -51,6 +52,20 @@ export default function App() {
       {result && (
         <div style={{ marginTop: 20, border: `3px solid ${COLORS[result.verdict]}`, borderRadius: 12, padding: 16 }}>
           <h2 style={{ color: COLORS[result.verdict], margin: 0 }}>{result.verdict}</h2>
+
+          <div style={{ background: "#e5e7eb", borderRadius: 8, height: 14, margin: "10px 0" }}>
+            <div
+              style={{
+                width: `${result.risk_score}%`,
+                height: "100%",
+                borderRadius: 8,
+                background: COLORS[result.verdict],
+                transition: "width 1s",
+              }}
+            />
+          </div>
+          <small>Risk score: {result.risk_score}/100</small>
+
           <p>{result.summary}</p>
           {result.red_flags.length > 0 && <strong>Red flags:</strong>}
           {result.red_flags.map((f, i) => (
@@ -61,6 +76,25 @@ export default function App() {
           ))}
           <strong>What to do:</strong>
           <p>{result.what_to_do}</p>
+
+          {result.warning_message && (
+            <a
+              href={`https://wa.me/?text=${encodeURIComponent(result.warning_message)}`}
+              target="_blank"
+              rel="noreferrer"
+              style={{
+                display: "inline-block",
+                marginTop: 10,
+                padding: "10px 16px",
+                background: "#25D366",
+                color: "white",
+                borderRadius: 8,
+                textDecoration: "none",
+              }}
+            >
+              📲 Warn your friends on WhatsApp
+            </a>
+          )}
         </div>
       )}
     </div>
