@@ -30,7 +30,8 @@ export default function App() {
       if (data.error) throw new Error(data.error);
       setResult(data);
     } catch (err) {
-      setError("Couldn't check this one. Try again or use another file.");
+      console.log(err);
+      setError("Couldn't check this one: " + err.message);
     }
     setLoading(false);
   }
@@ -44,7 +45,7 @@ export default function App() {
       {preview && <img src={preview} alt="upload" style={{ width: "100%", marginTop: 16, borderRadius: 8 }} />}
 
       <button onClick={check} disabled={!file || loading} style={{ marginTop: 16, padding: "10px 20px", fontSize: 16 }}>
-        {loading ? "Checking..." : "Check it"}
+        {loading ? "Reading the document... (takes a few seconds)" : "Check it"}
       </button>
 
       {error && <p style={{ color: "#dc2626" }}>{error}</p>}
@@ -67,8 +68,8 @@ export default function App() {
           <small>Risk score: {result.risk_score}/100</small>
 
           <p>{result.summary}</p>
-          {result.red_flags.length > 0 && <strong>Red flags:</strong>}
-          {result.red_flags.map((f, i) => (
+          {result.red_flags?.length > 0 && <strong>Red flags:</strong>}
+          {result.red_flags?.map((f, i) => (
             <div key={i} style={{ background: "#fee2e2", padding: 10, borderRadius: 8, margin: "8px 0" }}>
               <strong>{f.flag}</strong>
               <div style={{ fontStyle: "italic" }}>"{f.quote}"</div>

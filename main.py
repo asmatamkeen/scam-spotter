@@ -1,6 +1,9 @@
 import os
+import io
 import json
+import time
 import pymupdf
+from PIL import Image
 from dotenv import load_dotenv
 from fastapi import FastAPI, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
@@ -38,13 +41,29 @@ app.add_middleware(
 )
 
 
-def pdf_to_parts(data, max_pages=3):
+def shrink_image(data, max_size=1280):
+    img = Image.open(io.BytesIO(data)).convert("RGB")
+    img.thumbnail((max_size, max_size))
+    buf = io.BytesIO()
+    img.save(buf, format="JPEG", quality=80)
+    return buf.getvalue()
+
+
+def pdf_to_parts(data, max_pages=2):
     doc = pymupdf.open(stream=data, filetype="pdf")
     parts = []
     for i in range(min(len(doc), max_pages)):
-        pix = doc[i].get_pixmap(dpi=120)
+        pix = doc[i].get_pixmap(dpi=100)
         parts.append(types.Part.from_bytes(data=pix.tobytes("png"), mime_type="image/png"))
     return parts
+
+
+def extract_json(text):
+    start = text.find("{")
+    end = text.rfind("}")
+    if start == -1 or end == -1:
+        raise ValueError("No JSON found in: " + text[:200])
+    return json.loads(text[start:end + 1])
 
 
 @app.post("/check")
@@ -53,10 +72,17 @@ async def check(file: UploadFile = File(...)):
     if file.content_type == "application/pdf":
         parts = pdf_to_parts(data)
     else:
-        parts = [types.Part.from_bytes(data=data, mime_type=file.content_type)]
-    try:
-        response = client.models.generate_content(model=MODEL, contents=parts + [PROMPT])
-        text = response.text.replace("```json", "").replace("```", "").strip()
-        return json.loads(text)
-    except Exception as e:
-        return {"error": str(e)}
+        parts = [types.Part.from_bytes(data=shrink_image(data), mime_type="image/jpeg")]
+
+    last_error = ""
+    for attempt in range(3):
+        try:
+            start = time.time()
+            response = client.models.generate_content(model=MODEL, contents=parts + [PROMPT])
+            print("Gemma took:", round(time.time() - start, 1), "seconds")
+            return extract_json(response.text)
+        except Exception as e:
+            last_error = str(e)
+            print(f"Attempt {attempt + 1} failed:", last_error)
+            time.sleep(2)
+    return {"error": last_error}
